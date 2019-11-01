@@ -30,16 +30,24 @@ module.exports = function(RED) {
 
     if (node.telegramBot) {
       node.telegramBot.on('message', function(botMsg){
-        var msg = { payload: botMsg };
+        console.log(' -command- botMsg', botMsg);
         var chatId = botMsg.chat.id;
         var username = botMsg.from.username;
+        var userId = botMsg.from.id;
+        var messageId = botMsg.message_id;
+        console.log(' -command- chatId: ' + chatId);
+        console.log(' -command- messageId: ' + messageId);
+        var msg = {
+          payload: botMsg,
+          telegram: { chatId: chatId, messageId: messageId }
+        };
 
-        if (node.bot.isAuthorized(chatId, username)) {
+        if (node.bot.isAuthorized(chatId, userId, username)) {
           if (matchedCommand(node.command, botMsg.text)) {
             node.send(msg);
           }
         } else {
-          node.warn(`received unauthorized message in ${chatId} from '${username}'`);
+          node.warn(`received unauthorized message in ${chatId} from '${username}/${userId}'`);
         }
       });
     }

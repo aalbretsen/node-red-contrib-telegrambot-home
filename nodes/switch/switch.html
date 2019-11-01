@@ -11,7 +11,8 @@
         defaults: {
             name: { value: "" },
             bot: { value: "", type: "telegrambot-config", required: true },
-            chatId: { value: "", required: true },
+            chatId: { value: "", required: false },
+            rowSize: { value: -1, required: false, validate: RED.validators.number() },
             question: { value: "" },
             answers: { value: [] },
             outputs: { value: 1 },
@@ -182,6 +183,10 @@
         <label for="node-input-question">Question</label>
         <input type="text" id="node-input-question" placeholder="(e.g. Should I continue?)">
     </div>
+        <div class="form-row">
+        <label for="node-input-rowSize">Row size</label>
+        <input type="number" id="node-input-rowSize" placeholder="Buttons pr row">
+    </div>
     <div class="form-row node-input-answer-container-row">
         <input type="hidden" id="node-input-outputs"/>
         <ol id="node-input-answer-container"></ol>
@@ -204,7 +209,7 @@
         <dd>Telegram bot configuration for sending the message</dd>
 
         <dt>Chat ID <span class="property-type">int</span></dt>
-        <dd>Telegram chat ID to send the question</dd>
+        <dd>Optional Telegram chat ID to send the message. Chat ID from previous node or first chat ID in Telegram bot configuration will be used if not provided.</dd>
 
         <dt class="optional">Auto-Answer <span class="property-type">list</span></dt>
         <dd>When enabled, automatically respond to the Telegram callback to resolve it as finished. Otherwise, you will have to send a payload to Telegram yourself to mark the request as complete.</dd>
@@ -214,6 +219,9 @@
 
         <dt class="optional">Question <span class="property-type">string</span></dt>
         <dd>Question to ask the user. If not provided, <code>msg.payload</code> will be used.</dd>
+
+        <dt class="optional">Row size <span class="property-type">string</span></dt>
+        <dd>Optinal number of buttons pr row. If not set, all butons will be on the same row.</dd>
 
         <dt>Answers <span class="property-type">list</span></dt>
         <dd>The answer choices to present the user. Each answer will correspond to its designated output.</dd>

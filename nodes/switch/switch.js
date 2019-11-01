@@ -8,6 +8,7 @@ module.exports = function(RED) {
     // Get base configuration
     this.bot = RED.nodes.getNode(config.bot);
     this.chatId = parseInt(config.chatId);
+    this.rowSize = parseInt(config.rowSize) || 0;
     this.question = config.question || "";
     this.answers = config.answers || [];
     this.timeoutValue = config.timeoutValue || null;
@@ -17,12 +18,6 @@ module.exports = function(RED) {
 
     // Initialize bot
     utils.initializeBot(node);
-
-    // Verify inputs
-    if (!this.chatId || isNaN(this.chatId)) {
-      utils.updateNodeStatusFailed(node, "chat ID not provided");
-      return;
-    }
 
     if (this.timeoutValue !== null) {
       if (this.timeoutUnits === null) {
@@ -54,17 +49,32 @@ module.exports = function(RED) {
     this.on("input", function(msg){
       var question = this.question || msg.payload;
       var answers = this.answers || [];
-      var chatId = this.chatId;
+      console.log(" -switch- this.chatId " + this.chatId);
+      console.log(" -switch- msg.telegram ", msg.telegram);
+      var configuredChatId = node.bot.findChatId(this.chatId, msg.telegram);
+      console.log(" -switch- configuredChatId " + configuredChatId);
+      var messageIsMarkupAnswer = msg.telegram && msg.telegram.autoAnswerCallback && msg.telegram.callbackQueryId;
+      var alterMessageFromPreviousNode = !this.chatId && messageIsMarkupAnswer;
 
       if (question && answers.length > 0) {
         var listener = function(botMsg){
+          console.log(' -switch- botMsg', botMsg);
           var username = botMsg.from.username;
+          var userId = botMsg.from.id;
           var chatId = botMsg.message.chat.id;
           var messageId = botMsg.message.message_id;
           var callbackQueryId = botMsg.id;
 
-          if (botMsg.data && chatId === node.chatId && messageId === msg.telegram.messageId) {
-            if (node.bot.isAuthorized(chatId, username)) {
+          console.log(' -switch- chatId', chatId);
+          console.log(' -switch- configuredChatId', configuredChatId);
+          console.log(' -switch- chatId === configuredChatId', chatId === configuredChatId);
+
+          console.log(' -switch- messageId', messageId);
+          console.log(' -switch- msg.telegram.messageId', msg.telegram.messageId);
+          console.log(' -switch- messageId === msg.telegram.messageId', messageId === msg.telegram.messageId);
+
+          if (botMsg.data && chatId === configuredChatId && messageId === msg.telegram.messageId) {
+            if (node.bot.isAuthorized(chatId, userId, username)) {
               // Remove this listener since we got our reply
               node.telegramBot.removeListener("callback_query", listener);
 
@@ -82,14 +92,18 @@ module.exports = function(RED) {
                   // nothing to do here
                 });
 
-                // Remove quick reply options
-                node.telegramBot.editMessageReplyMarkup("{}", { chat_id: chatId, message_id: messageId }).then(function(sent){
-                  // nothing to do here
-                });
+                if (!alterMessageFromPreviousNode) {
+                  // Remove quick reply options
+                  node.telegramBot.editMessageReplyMarkup("{}", { chat_id: chatId, message_id: messageId }).then(function(sent){
+                   // nothing to do here
+                  });
+                }
               }
 
               // Augment original message with additional Telegram info
+              msg.telegram.chatId = configuredChatId;
               msg.telegram.callbackQueryId = callbackQueryId;
+              msg.telegram.autoAnswerCallback = node.autoAnswerCallback;
 
               // Continue with the original message
               var outPorts = ports.slice(0);
@@ -102,7 +116,7 @@ module.exports = function(RED) {
                 node.warn("invalid callback data received from telegram");
               }
             } else {
-              node.warn(`received callback in ${chatId} from '${username}' was unauthorized`);
+              node.warn(`received callback in ${chatId} from '${username}/${userId}' was unauthorized`);
             }
           } else {
             // This is not the listener you are looking for
@@ -122,6 +136,7 @@ module.exports = function(RED) {
           if (messageId && chatId) {
             node.telegramBot.editMessageReplyMarkup("{}", { chat_id: chatId, message_id: messageId }).then(function(sent){
               // nothing to do here
+              console.log(" -switch- timeout sent (for editMessageReplyMarkup) = ", sent);
             });
           }
 
@@ -132,34 +147,43 @@ module.exports = function(RED) {
           node.send(outPorts);
         };
 
+        var sentListener = function(sent) {
+          // Store sent message so we know how to respond later
+          console.log(" -switch- sent = ", sent);
+          msg.telegram = { messageId: sent.message_id };
+
+          if (node.timeoutDuration > 0) {
+            node.timeoutCallback = setTimeout(function(){
+                timeoutListener(sent);
+            }, node.timeoutDuration);
+            utils.updateNodeStatusPending(node, `waiting for reply (${node.timeoutValue}${node.timeoutUnits})`);
+          } else {
+            utils.updateNodeStatusPending(node, "waiting for reply");
+          }
+        };
 
         var chunkSize = 4000;
         var answerOpts = answers.map(function(answer, idx){
           return { text: answer, callback_data: idx };
         });
+
+        var splitOptsInRows = this.rowSize && this.rowSize > 0;
         var options = {
           reply_markup: {
-            inline_keyboard: [answerOpts]
-          }
+            inline_keyboard: splitOptsInRows ? utils.chunkArray(answerOpts, this.rowSize) : [answerOpts]
+          },
         };
 
         if (question.length > chunkSize) {
           utils.updateNodeStatusFailed(node, "message larger than allowed chunk size");
+        } else if (alterMessageFromPreviousNode) {
+          options.chat_id = configuredChatId;
+          options.message_id = msg.telegram.messageId;
+          node.telegramBot.editMessageText(question, options).then(sentListener);
+          node.telegramBot.editMessageReplyMarkup(options.reply_markup, options).then(sentListener);
+          node.telegramBot.on("callback_query", listener);
         } else {
-          node.telegramBot.sendMessage(chatId, question, options).then(function(sent){
-            // Store sent message so we know how to respond later
-            msg.telegram = { chatId: chatId, messageId: sent.message_id };
-
-            if (node.timeoutDuration > 0) {
-              node.timeoutCallback = setTimeout(function(){
-                timeoutListener(sent);
-              }, node.timeoutDuration);
-              utils.updateNodeStatusPending(node, `waiting for reply (${node.timeoutValue}${node.timeoutUnits})`);
-            } else {
-              utils.updateNodeStatusPending(node, "waiting for reply");
-            }
-          });
-
+          node.telegramBot.sendMessage(configuredChatId, question, options).then(sentListener);
           node.telegramBot.on("callback_query", listener);
         }
       }

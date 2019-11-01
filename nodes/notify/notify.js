@@ -14,12 +14,6 @@ module.exports = function(RED) {
     // Initialize bot
     utils.initializeBot(node);
 
-    // Verify inputs
-    if (!this.chatId || isNaN(this.chatId)) {
-      utils.updateNodeStatusFailed(node, "chat ID not provided");
-      return;
-    }
-
     this.on("input", function(msg){
       if (!(node.staticMessage || msg.payload)) {
         utils.updateNodeStatusFailed(node, "message payload is empty");
@@ -32,6 +26,7 @@ module.exports = function(RED) {
       var messageToSend;
       var options = { parse_mode: node.parseMode };
 
+      var firstMessage = true;
       do {
         if (message.length > chunkSize) {
           messageToSend = message.substr(0, chunkSize);
@@ -40,11 +35,25 @@ module.exports = function(RED) {
           messageToSend = message;
           done = true;
         }
+        var chatId = node.bot.findChatId(node.chatId, msg.telegram);
 
-        node.telegramBot.sendMessage(node.chatId, messageToSend, options).then(function(sent){
-          msg.telegram = { sentMessageId: sent.message_id };
-          node.send(msg);
-        });
+        var sentListener = function (sent) {
+            msg.telegram = {sentMessageId: sent.message_id};
+            node.send(msg);
+        };
+
+        var messageIsMarkupAnswer = msg.telegram && msg.telegram.autoAnswerCallback && msg.telegram.callbackQueryId;
+        var alterMessageFromPreviousNode = firstMessage && !node.chatId && messageIsMarkupAnswer;
+        if (alterMessageFromPreviousNode) {
+            options.reply_markup = {};
+            options.chat_id = chatId;
+            options.message_id = msg.telegram.messageId;
+            node.telegramBot.editMessageText(messageToSend, options).then(sentListener);
+        } else {
+          node.telegramBot.sendMessage(chatId, messageToSend, options).then(sentListener);
+        }
+
+        firstMessage = false;
       } while (!done);
     });
 

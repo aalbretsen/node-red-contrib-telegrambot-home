@@ -26,8 +26,8 @@
         <input type="text" id="node-config-input-token" placeholder="(e.g. 12345:ABCdef-FDAfds)">
     </div>
     <div class="form-row">
-        <label for="node-config-input-usernames"><i class="fa fa-user"></i> Users</label>
-        <input type="text" id="node-config-input-usernames" placeholder="(e.g. hugo,sepp,egon)">
+        <label for="node-config-input-usernames"><i class="fa fa-user"></i> Users (id or username)</label>
+        <input type="text" id="node-config-input-usernames" placeholder="(e.g. hugo,12345678,egon)">
     </div>
     <div class="form-row">
         <label for="node-config-input-chatIds"><i class="fa fa-comment"></i> Chat IDs</label>
@@ -50,8 +50,8 @@
         <dt>Token <span class="property-type">string</span></dt>
         <dd>Token provided by botfather for connecting to Telegram</dd>
 
-        <dt class="optional">Users <span class="property-type">list</span></dt>
-        <dd>Optional. Usernames the bot is permitted access. Enter values in comma separated format. Leave blank to allow everyone.</dd>
+        <dt class="optional">Users (id or username)<span class="property-type">list</span></dt>
+        <dd>Optional. Usernames or IDs the bot is permitted access. Enter values in comma separated format. Leave blank to allow everyone.</dd>
 
         <dt class="optional">Chat IDs <span class="property-type">list</span></dt>
         <dd>Optional. Chat IDs the bot is permitted access. Enter values in comma separated format. Leave blank to allow all.</dd>

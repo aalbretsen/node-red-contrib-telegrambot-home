@@ -8,7 +8,7 @@
         defaults: {
             name: { value: "" },
             bot: { value: "", type: "telegrambot-config", required: true },
-            chatId: { value: "", required: true },
+            chatId: { value: "", required: false },
             message: { value: "", required: false },
             parseMode: { value: "", required: false }
         },
@@ -64,7 +64,7 @@
         <dd>Telegram bot configuration for sending the message</dd>
 
         <dt>Chat ID <span class="property-type">int</span></dt>
-        <dd>Telegram chat ID to send the message</dd>
+        <dd>Optional Telegram chat ID to send the message. Chat ID from previous node or first chat ID in Telegram bot configuration will be used if not provided.</dd>
 
         <dt>Parse Mode <span class="property-type">enum</span></dt>
         <dd>How the Telegram client should parse the message. Can be plain text, <a href="https://core.telegram.org/bots/api/#markdown-style" target="_blank" rel="noopener noreferrer">Markdown</a>, or <a href="https://core.telegram.org/bots/api/#html-style" target="_blank" rel="noopener noreferrer">HTML</a>.</dd>
